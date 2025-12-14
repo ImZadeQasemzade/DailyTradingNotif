@@ -1,8 +1,6 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import numpy as np
-import numpy as np
 import requests
 import os
 
@@ -13,7 +11,7 @@ import os
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 SYMBOLS = ["SPY", "TQQQ", "TECL", "SPXL", "UVXY", "SQQQ", "BSV"]
-START_DATE = "2010-01-01" # Adjust as needed
+START_DATE = "2020-01-01" # Adjust as needed
 END_DATE = None # Today
 
 def calculate_sma(series, window):
@@ -206,3 +204,4 @@ def run_daily_signal():
 
 if __name__ == "__main__":
     run_daily_signal()
+
