@@ -1,7 +1,5 @@
 import yfinance as yf
 import pandas as pd
-# import pandas_ta as ta # Removed due to install errors
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy as np
 import numpy as np
@@ -12,8 +10,8 @@ import os
 # 1. Create a bot with @BotFather on Telegram to get the token.
 # 2. Send a message to your bot and then visit https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates to find your "id" (chat_id).
 # Default to environment variables (for GitHub Actions), fallback to hardcoded strings for local testing.
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8294907161:AAE_2zZ8DzdpB2-wN5Z3nQH8kBgi24B3_0w")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "259928123")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 SYMBOLS = ["SPY", "TQQQ", "TECL", "SPXL", "UVXY", "SQQQ", "BSV"]
 START_DATE = "2010-01-01" # Adjust as needed
 END_DATE = None # Today
@@ -158,107 +156,30 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"Failed to send Telegram message: {e}")
 
-def run_backtest():
-    # 1. Fetch Data
-    df_prices = fetch_data(SYMBOLS, START_DATE, END_DATE)
-    df_prices = df_prices.dropna() # Drop initial NaNs if any, though ffill helps.
+
+def run_daily_signal():
+    # 1. Fetch Data (Optimized for signal generation, just need enough data for indicators)
+    # We need at least 200 days for SMA200 + some buffer for lookback
+    print("Fetching recent data for signal generation...")
+    
+    # Fetch last 365 days to be safe for 200 SMA
+    start_date_signal = (pd.Timestamp.now() - pd.DateOffset(days=400)).strftime('%Y-%m-%d')
+    df_prices = fetch_data(SYMBOLS, start_date_signal, None)
+    df_prices = df_prices.dropna()
     
     # 2. Indicators
-    # We need to make sure we have RSIs for SQQQ and BSV as used in the logic
     indicators_df = calculate_indicators(df_prices)
     indicators_df['SQQQ_RSI_10'] = calculate_rsi(df_prices['SQQQ'], 10)
     indicators_df['BSV_RSI_10'] = calculate_rsi(df_prices['BSV'], 10)
     
     # Align Dataframes
-    # Indicators will have NaNs at the start (first 200 days for SMA 200). We must drop these rows.
     combined = pd.concat([df_prices, indicators_df], axis=1).dropna()
     
-    # 3. Simulate
-    print("Running simulation...")
-    portfolio_values = [10000.0] # Start with $10k
-    allocations = []
-    
-    # Iterate through days. 
-    # Logic: On Day T (close), we calculate signal. We buy Asset X.
-    # We hold Asset X from Day T Close to Day T+1 Close.
-    # Return = (Price_Asset_T+1 / Price_Asset_T) - 1
-    
-    dates = combined.index
-    
-    for i in range(len(dates) - 1):
-        current_date = dates[i]
-        next_date = dates[i+1]
-        
-        row_prices = combined.loc[current_date]
-        row_indicators = combined.loc[current_date] # Use same row for indicators
-        
-        # Determine target asset
-        target_asset = select_asset(row_prices, row_indicators)
-        allocations.append(target_asset)
-        
-        # Calculate Return for NEXT day
-        start_price = row_prices[target_asset] # Price at Close of Signal Day
-        end_price = combined.loc[next_date, target_asset] # Price at Close of Next Day
-        
-        daily_return = (end_price - start_price) / start_price
-        
-        new_value = portfolio_values[-1] * (1 + daily_return)
-        portfolio_values.append(new_value)
-        
-    # Append last allocation placeholder
-    allocations.append(allocations[-1]) 
-        
-    # 4. Results
-    results_df = pd.DataFrame({
-        'Portfolio': portfolio_values,
-        'Allocation': allocations
-    }, index=dates)
-    
-    # Benchmark (Buy and Hold SPY)
-    spy_start = combined.loc[dates[0], 'SPY']
-    results_df['SPY_Benchmark'] = (combined['SPY'] / spy_start) * 10000.0
-    
-    # Stats
-    total_return = (results_df['Portfolio'].iloc[-1] / results_df['Portfolio'].iloc[0]) - 1
-    cagr = (results_df['Portfolio'].iloc[-1] / results_df['Portfolio'].iloc[0]) ** (252 / len(results_df)) - 1
-    
-    # Max Drawdown
-    rolling_max = results_df['Portfolio'].cummax()
-    drawdown = (results_df['Portfolio'] - rolling_max) / rolling_max
-    max_dd = drawdown.min()
-    
-    print("-" * 30)
-    print(f"Backtest Results ({dates[0].date()} to {dates[-1].date()})")
-    print("-" * 30)
-    print(f"Total Return: {total_return:.2%}")
-    print(f"CAGR:         {cagr:.2%}")
-    print(f"Max Drawdown: {max_dd:.2%}")
-    print("-" * 30)
-    
-    # Identify trades
-    # A trade occurs when the allocation changes from the previous day
-    # shift(1) gives the previous day's allocation. 
-    # We treat the first day as a trade (entry).
-    trades_mask = results_df['Allocation'] != results_df['Allocation'].shift(1)
-    trade_dates = results_df.index[trades_mask]
-    trade_values = results_df.loc[trade_dates, 'Portfolio']
+    if combined.empty:
+        print("Error: Not enough data to calculate indicators.")
+        return
 
-    # Plot
-    plt.figure(figsize=(12, 6))
-    plt.plot(results_df.index, results_df['Portfolio'], label='Strategy')
-    plt.plot(results_df.index, results_df['SPY_Benchmark'], label='SPY Benchmark', alpha=0.7)
-    
-    # Plot Trade Markers
-    plt.scatter(trade_dates, trade_values, marker='^', color='black', s=30, label='Trade', zorder=5)
-
-    plt.yscale('log')
-    plt.title("TQQQ Long Term V2 vs SPY")
-    plt.legend()
-    plt.grid(True, which="both", ls="-", alpha=0.2)
-    plt.savefig('backtest_results.png')
-    print("Chart saved to backtest_results.png")
-    
-    # 5. Latest Signal
+    # 3. Latest Signal
     print("\n" + "=" * 30)
     print(" LATEST TRADING SIGNAL")
     print("=" * 30)
@@ -271,17 +192,6 @@ def run_backtest():
     
     print(f"Date: {last_date.date()}")
     print(f"Current Allocation Recommendation: {recommended_asset}")
-    
-    # Check if we need to trade
-    # We compare with the previous day's allocation in the backtest results
-    # The 'Allocation' column in results_df represents what we held FROM that day TO the next.
-    # So results_df.iloc[-1]['Allocation'] is what we decided to hold on the last day of the simulation.
-    # Wait, let's be careful. 
-    # Logic in loop: 
-    # target_asset = select_asset(row_prices, row_indicators) -> decided on 'current_date' close.
-    # So for the last date in 'combined', we just calculated 'recommended_asset'.
-    # This is what we should hold starting from 'last_date' close until the next day.
-    
     print(f"Action: Buy/Hold {recommended_asset} at Close")
     print("=" * 30)
 
@@ -295,4 +205,4 @@ def run_backtest():
     send_telegram_message(msg)
 
 if __name__ == "__main__":
-    run_backtest()
+    run_daily_signal()
