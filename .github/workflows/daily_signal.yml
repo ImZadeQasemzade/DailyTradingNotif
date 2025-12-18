@@ -6,7 +6,7 @@ on:
     # Vancouver (PT):
     # - Summer (PDT): 12:45 PM (15 mins before close)
     # - Winter (PST): 11:45 AM (1 hr 15 mins before close)
-    - cron: '45 19 * * 1-5'
+    - cron: '37 19 * * 1-5'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
