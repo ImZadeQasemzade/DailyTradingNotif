@@ -5,6 +5,8 @@ import requests
 import os
 import matplotlib.pyplot as plt
 import io
+import pytz
+from datetime import datetime, time
 
 # --- Telegram Configuration ---
 # 1. Create a bot with @BotFather on Telegram to get the token.
@@ -13,7 +15,7 @@ import io
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 SYMBOLS = ["SPY", "TQQQ", "TECL", "SPXL", "UVXY", "SQQQ", "BSV"]
-START_DATE = "2015-01-01" # Adjust as needed
+START_DATE = "2020-01-01" # Adjust as needed
 END_DATE = None # Today
 
 def calculate_sma(series, window):
@@ -236,6 +238,32 @@ def send_telegram_message(message, image_file=None):
 
 
 def run_daily_signal():
+    # --- Time Check for DST Support ---
+    # Goal: Run ONLY if current ET time is within 15:30 - 15:55 window.
+    # This supports the dual cron schedule (19:45, 20:45 UTC).
+    
+    # Check for FORCE_RUN env var (for manual dispatch or testing)
+    force_run = os.environ.get("FORCE_RUN", "false").lower() == "true"
+    
+    if not force_run:
+        try:
+            tz_et = pytz.timezone('US/Eastern')
+            now_et = datetime.now(tz_et)
+            current_time = now_et.time()
+            
+            # Target window: 15:35 to 15:55 (giving plenty of buffer for 15:45 target)
+            start_window = time(15, 35)
+            end_window = time(15, 55)
+            
+            if not (start_window <= current_time <= end_window):
+                print(f"Skipping run: Current ET time {now_et.strftime('%H:%M')} is not within target window (15:35-15:55).")
+                print("This allows the dual UTC schedule to handle DST correctly under Github Actions.")
+                return
+            else:
+                print(f"Time check passed: Current ET time {now_et.strftime('%H:%M')} is within target window.")
+        except Exception as e:
+            print(f"Warning: Time check failed ({e}). Proceeding with caution.")
+
     # 1. Fetch Data (Optimized for signal generation, just need enough data for indicators)
     # We need at least 200 days for SMA200 + some buffer for lookback
     print("Fetching recent data for signal generation...")
