@@ -12,8 +12,8 @@ from datetime import datetime, time
 # 1. Create a bot with @BotFather on Telegram to get the token.
 # 2. Send a message to your bot and then visit https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates to find your "id" (chat_id).
 # Default to environment variables (for GitHub Actions), fallback to hardcoded strings for local testing.
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8294907161:AAE_2zZ8DzdpB2-wN5Z3nQH8kBgi24B3_0w")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "259928123")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 SYMBOLS = ["SPY", "TQQQ", "TECL", "SPXL", "UVXY", "SQQQ", "BSV"]
 START_DATE = "2020-01-01" # Adjust as needed
 END_DATE = None # Today
@@ -299,3 +299,4 @@ def run_daily_signal():
 
 if __name__ == "__main__":
     run_daily_signal()
+
