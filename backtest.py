@@ -98,29 +98,29 @@ def select_asset(row, indicators_row):
         # Bull Market Branch
         
         # Check TQQQ RSI
-        if tqqq_rsi_10 > 79:
-            return "UVXY", f"Bull Market (SPY > SMA200) but TQQQ Overbought (RSI {tqqq_rsi_10:.1f} > 79)"
+        if tqqq_rsi_10 > 76:
+            return "UVXY", f"Bull Market (SPY > SMA200) but TQQQ Overbought (RSI {tqqq_rsi_10:.1f} > 76)"
         else:
             # Check SPXL RSI
-            if spxl_rsi_10 > 80:
-                return "UVXY", f"Bull Market (SPY > SMA200) but SPXL Overbought (RSI {spxl_rsi_10:.1f} > 80)"
+            if spxl_rsi_10 > 71:
+                return "UVXY", f"Bull Market (SPY > SMA200) but SPXL Overbought (RSI {spxl_rsi_10:.1f} > 71)"
             else:
                 return "TQQQ", f"Bull Market (SPY > SMA200) and Momentum Healthy"
     else:
         # Bear/Correction Branch
         
         # Check TQQQ RSI
-        if tqqq_rsi_10 < 31:
-            return "TECL", f"Bear Market (SPY < SMA200) but TQQQ Oversold (RSI {tqqq_rsi_10:.1f} < 31)"
+        if tqqq_rsi_10 < 26:
+            return "TECL", f"Bear Market (SPY < SMA200) but TQQQ Oversold (RSI {tqqq_rsi_10:.1f} < 26)"
         else:
             # Check SPY RSI
-            if spy_rsi_10 < 30:
-                return "SPXL", f"Bear Market (SPY < SMA200) but SPY Oversold (RSI {spy_rsi_10:.1f} < 30)"
+            if spy_rsi_10 < 27:
+                return "SPXL", f"Bear Market (SPY < SMA200) but SPY Oversold (RSI {spy_rsi_10:.1f} < 27)"
             else:
                 # Check UVXY RSI
-                if uvxy_rsi_10 > 74:
+                if uvxy_rsi_10 > 71:
                     # High Volatility
-                    if uvxy_rsi_10 > 84:
+                    if uvxy_rsi_10 > 75:
                         # Extreme Volatility
                         if tqqq_price > tqqq_sma_20:
                             return "TQQQ", f"Bear Market, Extreme Volatility (UVXY RSI {uvxy_rsi_10:.1f}), but TQQQ > SMA20"
@@ -129,7 +129,7 @@ def select_asset(row, indicators_row):
                             asset = select_top_rsi(["SQQQ", "BSV"], indicators_row)
                             return asset, f"Bear Market, Extreme Volatility (UVXY RSI {uvxy_rsi_10:.1f}), TQQQ < SMA20. Selected {asset} by RSI."
                     else:
-                        return "UVXY", f"Bear Market, High Volatility (UVXY RSI {uvxy_rsi_10:.1f} > 74)"
+                        return "UVXY", f"Bear Market, High Volatility (UVXY RSI {uvxy_rsi_10:.1f} > 71)"
                 else:
                     # Low/Moderate Volatility in Downtrend
                     if tqqq_price > tqqq_sma_20:
@@ -199,11 +199,11 @@ def generate_chart(df_prices, indicators_df, recommended_asset, window_days=180,
     ax3.plot(df_i.index, df_i['SPXL_RSI_10'], label='SPXL RSI', color='green', linewidth=1, alpha=0.7)
     ax3.plot(df_i.index, df_i['UVXY_RSI_10'], label='UVXY RSI', color='red', linewidth=1)
     
-    # Determine critical levels based on logic (79/80/30/31 etc)
-    ax3.axhline(79, color='red', linestyle=':', alpha=0.5, label='Overbought (79/80)')
-    ax3.axhline(30, color='green', linestyle=':', alpha=0.5, label='Oversold (30/31)')
+    # Determine critical levels based on logic (76/71/26/27 etc)
+    ax3.axhline(76, color='red', linestyle=':', alpha=0.5, label='Overbought (76/71)')
+    ax3.axhline(27, color='green', linestyle=':', alpha=0.5, label='Oversold (26/27)')
     
-    ax3.set_title("Indicators: RSI 10 (Critical levels at 30 & 79)")
+    ax3.set_title("Indicators: RSI 10 (Critical levels at 27 & 76)")
     ax3.set_ylabel("RSI")
     ax3.set_ylim(0, 100)
     ax3.legend(loc='upper left', ncol=3)
