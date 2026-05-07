@@ -18,6 +18,7 @@ SYMBOLS = ["SPY", "TQQQ", "TECL", "SPXL", "UVXY", "SQQQ", "BSV", "GLD"]
 START_DATE = "2020-01-01" # Adjust as needed
 END_DATE = None # Today
 
+
 def calculate_sma(series, window):
     return series.rolling(window=window).mean()
 
@@ -317,9 +318,85 @@ def send_telegram_message(message, image_file=None):
             print(f"Failed to send Telegram message: {e}")
 
 
+def compute_recent_trades(combined, n_completed=4):
+    """
+    Simulates the strategy over `combined` and returns:
+      - last n_completed finished trades as a list of dicts
+      - current_trade dict representing the still-open position
+    This is always fresh — no static file dependency.
+    """
+    portfolio_value = 10000.0
+    current_asset = None
+    start_date = None
+    start_value = None
+    completed_trades = []
+
+    dates = combined.index
+
+    for i in range(len(dates) - 1):
+        current_date = dates[i]
+        next_date = dates[i + 1]
+
+        row = combined.loc[current_date]
+        target_asset, _ = select_asset(row, row)
+
+        if target_asset != current_asset:
+            if current_asset is not None:
+                pct = (portfolio_value - start_value) / start_value
+                completed_trades.append({
+                    "entry_date": start_date.strftime('%Y-%m-%d'),
+                    "exit_date":  current_date.strftime('%Y-%m-%d'),
+                    "asset":      current_asset,
+                    "change_pct": f"{pct:+.2%}",
+                })
+            current_asset = target_asset
+            start_date = current_date
+            start_value = portfolio_value
+
+        # Apply daily return for next day
+        entry_price = combined.loc[current_date, target_asset]
+        exit_price  = combined.loc[next_date,    target_asset]
+        daily_return = (exit_price - entry_price) / entry_price
+        portfolio_value *= (1 + daily_return)
+
+    # Current open (live) trade
+    live_change = (portfolio_value - start_value) / start_value
+    current_trade = {
+        "entry_date": start_date.strftime('%Y-%m-%d'),
+        "exit_date":  f"{dates[-1].date()} (Today)",
+        "asset":      current_asset,
+        "change_pct": f"{live_change:+.2%}",
+    }
+
+    return completed_trades[-n_completed:], current_trade
+
+
+def build_trade_summary_message(trades, current_trade=None):
+    """Formats the last N completed trades + the current live trade into a Telegram-ready Markdown message."""
+    if not trades and current_trade is None:
+        return "📋 *Recent Trade Log*\n_No trade data available._"
+
+    lines = ["📋 *Recent Trade Log (Last 4 + Current)*\n"]
+    for t in trades:
+        emoji = "🟢" if t["change_pct"].startswith("+") else "🔴"
+        lines.append(
+            f"{emoji} `{t['entry_date']}` → `{t['exit_date']}` "
+            f"| *{t['asset']}* | {t['change_pct']}"
+        )
+
+    if current_trade:
+        pct = current_trade["change_pct"]
+        emoji = "🟢" if pct.startswith("+") else "🔴"
+        lines.append(
+            f"{emoji} `{current_trade['entry_date']}` → `{current_trade['exit_date']}` "
+            f"| *{current_trade['asset']}* | {pct}  _(ongoing)_"
+        )
+
+    return "\n".join(lines)
+
+
 def run_daily_signal():
     # Time check removed to allow running anytime.
-
 
     # 1. Fetch Data (Optimized for signal generation, just need enough data for indicators)
     # We need at least 200 days for SMA200 + some buffer for lookback
@@ -396,7 +473,7 @@ def run_daily_signal():
         print(f"Error generating chart: {e}")
         chart_buf = None
 
-    # Send Notification
+    # --- Message 1: Main signal + chart ---
     msg = (
         f"🚀 *Composer Strategy Signal*\n"
         f"📅 Date: {last_date.date()}\n"
@@ -409,6 +486,13 @@ def run_daily_signal():
         f"SPY/GLD Ratio: {latest_row_indicators.get('SPY_GLD_Ratio', 'N/A'):.2f}"
     )
     send_telegram_message(msg, image_file=chart_buf)
+
+    # --- Message 2: Last 4 completed trades + current live trade (computed from live price data) ---
+    print("Computing recent trade history from live price data...")
+    last_trades, current_trade = compute_recent_trades(combined, n_completed=4)
+    trade_msg = build_trade_summary_message(last_trades, current_trade=current_trade)
+    print("Sending trade summary message...")
+    send_telegram_message(trade_msg)
 
 if __name__ == "__main__":
     run_daily_signal()
