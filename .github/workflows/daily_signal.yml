@@ -2,10 +2,10 @@ name: Daily Trading Signal
 
 on:
   schedule:
-    # Runs at 19:45 UTC every weekday.
+    # Runs at 19:45 UTC every weekday. Summer: 19 UTC = 12 PDT. Winter: 20 UTC = 12 PST
     # We run at BOTH 19:45 UTC (Summer/EDT) and 20:45 UTC (Winter/EST).
     # The Python script will check the actual ET time and exit if it's not the target window (15:45 ET).
-    - cron: '01 17,18,19,20 * * 1-5'
+    - cron: '30 19,20 * * 1-5'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
